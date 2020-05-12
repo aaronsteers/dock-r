@@ -2,7 +2,7 @@
 
 import fire as _fire
 
-from dock_r.main import [
+from dock_r.main import (
     login,
     build,
     tag,
@@ -17,7 +17,7 @@ from dock_r.main import [
     ecs_wait_for_stop,
     get_ecs_log_url,
     get_ecs_task_detail_url,
-]
+)
 
 def _main():
     _fire.Fire()

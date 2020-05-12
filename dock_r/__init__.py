@@ -1,4 +1,4 @@
-from dock_r.main import [
+from dock_r.main import (
     login,
     tag,
     build,
@@ -14,4 +14,4 @@ from dock_r.main import [
     get_ecs_task_detail_url,
     ecs_wait_for_start,
     ecs_wait_for_stop,
-]
+)
