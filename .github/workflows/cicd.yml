@@ -27,7 +27,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install flake8 pytest
-      - name: Install ezdockr
+      - name: Install dock-r
         run: |
           python3 setup.py install
       - name: Lint with flake8
@@ -62,7 +62,7 @@ jobs:
         uses: einaregilsson/build-number@v2
         with:
           token: ${{secrets.github_token}}
-      - name: Push to PyPi (https://pypi.org/project/ezdockr/)
+      - name: Push to PyPi (https://pypi.org/project/dock-r/)
         env:
           # VERSION: ${{ github.ref }}
           BRANCH_NAME: ${{ github.ref }}
@@ -79,9 +79,9 @@ jobs:
       - name: Sleep before install
         run: |
           sleep 60
-      - name: Test install (pip install ezdockr)
+      - name: Test install (pip install dock-r)
         run: |
-          pip install ezdockr
-      - name: Test uninstall (pip uninstall ezdockr)
+          pip install dock-r
+      - name: Test uninstall (pip uninstall dock-r)
         run: |
-          pip uninstall -y ezdockr
+          pip uninstall -y dock-r

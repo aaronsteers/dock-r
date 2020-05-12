@@ -7,7 +7,7 @@ from setuptools import setup
 
 DETECTED_VERSION = None
 VERSION_FILEPATH = "VERSION"
-PACKAGE_NAME = "ezdockr"
+PACKAGE_NAME = "dock-r"
 PACKAGE_ONELINER = "Tools to go faster with docker."
 GIT_REPO_URL = "https://www.github.com/aaronsteers/runnow"
 AUTHOR_NAME = "Aaron (AJ) Steers"
@@ -34,7 +34,7 @@ Path(VERSION_FILEPATH).write_text(f"v{DETECTED_VERSION}")
 
 setup(
     name=PACKAGE_NAME,
-    packages=[PACKAGE_NAME],
+    packages=[PACKAGE_NAME.replace("-", "_")],
     version=DETECTED_VERSION,
     license="MIT",
     description=f"{PACKAGE_NAME} - {PACKAGE_ONELINER}",
@@ -47,7 +47,7 @@ setup(
     entry_points={
         "console_scripts": [
             # Register CLI commands:
-            "runnow = runnow.runnow:main",
+            "dock-r = dock_r.cli:_main",
         ]
     },
     include_package_data=True,
