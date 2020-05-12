@@ -1,4 +1,4 @@
-"""Runnow.dockerutils module, helps with dockerization."""
+"""dock_r module, helps with dockerization."""
 
 import fire as _fire
 

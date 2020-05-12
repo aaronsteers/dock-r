@@ -1,4 +1,4 @@
-"""Runnow.dockerutils module, helps with dockerization."""
+"""dock_r module, helps with dockerization."""
 
 import datetime
 import hashlib
@@ -7,15 +7,14 @@ import time
 import os
 
 import docker
-import fire
 from logless import get_logger, logged, logged_block
-import uio as io
-import runnow.jobs as jobs
+import runnow
+import uio
 
 MAX_ECS_WAIT = 12 * 60 * 60  # max 12 hours wait
 
 docker_client = docker.from_env()
-logging = get_logger("slalom.dataops.dockerutils")
+logging = get_logger("dock-r")
 
 
 def build(dockerfile_path, tag_as, addl_args=None):
@@ -28,7 +27,7 @@ def build(dockerfile_path, tag_as, addl_args=None):
         cmd = f"docker build {addl_args} {tags} {folder_path} -f {dockerfile_path}"
     else:
         cmd = f"docker build {addl_args} {folder_path} -f {dockerfile_path}"
-    jobs.run(cmd)
+    runnow.run(cmd)
 
 
 def _to_list(str_or_list):
@@ -43,14 +42,14 @@ def tag(image_name: str, tag_as):
     """Tag an image. 'tag_as' can be a string or list of strings."""
     tag_as = _to_list(tag_as)
     for tag in tag_as:
-        jobs.run(f"docker tag {image_name} {tag}")
+        runnow.run(f"docker tag {image_name} {tag}")
 
 
 @logged("pushing image '{image_name}'")
 def push(image_name):
     # docker_client.images.push(image_name)
     cmd = f"docker push {image_name}"
-    jobs.run(cmd)
+    runnow.run(cmd)
 
 
 def smart_split(dockerfile_path: str, tag_as, addl_args=None):
@@ -64,11 +63,11 @@ def smart_split(dockerfile_path: str, tag_as, addl_args=None):
     )
     dockerfile_path_core = os.path.realpath(f"{dockerfile_path}.core")
     dockerfile_path_derived = os.path.realpath(f"{dockerfile_path}.quick")
-    io.create_text_file(filepath=dockerfile_path_core, contents=dockerfile_core)
+    uio.create_text_file(filepath=dockerfile_path_core, contents=dockerfile_core)
     if dockerfile_derived:
-        io.create_text_file(filepath=dockerfile_path_derived, contents=dockerfile_derived)
+        uio.create_text_file(filepath=dockerfile_path_derived, contents=dockerfile_derived)
     else:
-        io.delete_file(dockerfile_path_derived, ignore_missing=True)
+        uio.delete_file(dockerfile_path_derived, ignore_missing=True)
         dockerfile_path_derived = None
     return image_core, dockerfile_path_core, image_derived, dockerfile_path_derived
 
@@ -132,7 +131,7 @@ def pull(image_name, skip_if_exists=False, silent=False):
         logging.info(f"Skipping image pull. Already exists locally: {image_name}")
         return image_name
     try:
-        jobs.run(f"docker pull {image_name}", raise_error=True)
+        runnow.run(f"docker pull {image_name}", raise_error=True)
     except Exception as ex:
         logging.info(f"Failed to pull image: {image_name}\n{ex}")
         if silent:
@@ -177,7 +176,7 @@ def _smart_split(dockerfile_path, image_name, addl_args=None):
     2. The second 'derived' image will pull from 'core' and complete the build using
     local files or artifacts required by ADD or COPY commands.
     """
-    orig_text = io.get_text_file_contents(dockerfile_path)
+    orig_text = uio.get_text_file_contents(dockerfile_path)
     addl_args = addl_args or ""
     core_dockerfile = ""
     derived_dockerfile = ""
@@ -212,10 +211,10 @@ def _smart_split(dockerfile_path, image_name, addl_args=None):
 def ecs_login(region):
     logging.info("Logging into ECS...")
     try:
-        _, ecs_login_cmd = jobs.run(
+        _, ecs_login_cmd = runnow.run(
             f"aws ecr get-login --region {region} --no-include-email", echo=False
         )
-        _, _ = jobs.run(ecs_login_cmd, hide=True)
+        _, _ = runnow.run(ecs_login_cmd, hide=True)
     except Exception as ex:
         raise RuntimeError(f"ECS login failed. {ex}")
 
@@ -235,11 +234,11 @@ def login(raise_error=False):
         return False
     logging.info(f"Logging into docker registry '{registry}' as user '{usr}'...")
     try:
-        jobs.run(
+        runnow.run(
             f"docker login {registry} --username {usr} --password {pwd}", hide=True
         )
         if registry == "index.docker.io":
-            jobs.run(f"docker login --username {usr} --password {pwd}", hide=True)
+            runnow.run(f"docker login --username {usr} --password {pwd}", hide=True)
     except Exception as ex:
         if raise_error:
             raise RuntimeError(f"Docker login failed. {ex}")
@@ -257,7 +256,7 @@ def ecs_retag(image_name, existing_tag, tag_as):
         f" --repository-name {image_name} --image-ids imageTag={existing_tag}"
         f" --query 'images[].imageManifest' --output text"
     )
-    _, manifest = jobs.run(get_manifest_cmd, echo=False)
+    _, manifest = runnow.run(get_manifest_cmd, echo=False)
     for new_tag in tag_as:
         if "amazonaws.com/" in new_tag:
             new_tag = new_tag.split("amazonaws.com/")[1]
@@ -278,7 +277,7 @@ def ecs_retag(image_name, existing_tag, tag_as):
             "--image-manifest",
             manifest,
         ]
-        return_code, output_text = jobs.run(
+        return_code, output_text = runnow.run(
             put_image_cmd, shell=False, echo=False, hide=True, raise_error=False
         )
         if return_code != 0 and "ImageAlreadyExistsException" in output_text:
@@ -366,7 +365,7 @@ def ecs_submit(
             "}]}'"
         )
         cmd += overrides
-    return_code, output_text = jobs.run(cmd, raise_error=False, echo=False)
+    return_code, output_text = runnow.run(cmd, raise_error=False, echo=False)
     if return_code != 0:
         raise RuntimeError(f"Could not start task: {output_text}")
     jsonobj = json.loads(output_text)
@@ -454,16 +453,16 @@ def _ecs_wait_for(
         heartbeat_interval=heartbeat_interval,
     ):
         timeout_time = time.time() + (timeout or MAX_ECS_WAIT)
-        return_code, output_text = jobs.run(wait_cmd, raise_error=False)
+        return_code, output_text = runnow.run(wait_cmd, raise_error=False)
         while return_code == 255 and time.time() < timeout_time:
             logging.info("aws cli timeout expired. Retrying...")
-            return_code, output_text = jobs.run(wait_cmd, raise_error=True)
+            return_code, output_text = runnow.run(wait_cmd, raise_error=True)
         if return_code != 0:
             raise RuntimeError(
                 f"ECS wait command failed or timed out (return={return_code}).\n"
                 f"{output_text}"
             )
-    return_code, output_text = jobs.run(desc_cmd, raise_error=False)
+    return_code, output_text = runnow.run(desc_cmd, raise_error=False)
     if return_code != 0:
         raise RuntimeError(f"ECS task describe failed.\n{output_text}")
 
@@ -474,11 +473,3 @@ def _ecs_wait_for(
     logging.info(f"ECS task status: {get_ecs_task_detail_url(region, task_arn, cluster)}")
     logging.info(f"ECS task logs:   {get_ecs_log_url(region, task_arn)}")
     return task_arn
-
-
-def main():
-    fire.Fire()
-
-
-if __name__ == "__main__":
-    main()
