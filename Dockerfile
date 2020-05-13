@@ -21,8 +21,6 @@ RUN pip3 install --upgrade \
     psutil \
     xmlrunner
 
-RUN python3 setup.py install
-
 RUN mkdir -p $ARTIFACTS_ROOT
 RUN mkdir -p $TESTS_OUTPUT
 
