@@ -91,7 +91,10 @@ jobs:
         run: |
           docker build -t dataopstk/dock-r:latest-dev .
           docker push dataopstk/dock-r:latest-dev
-      - name: Retag Dataops image
+      - name: Temporarily retag local image as latest
+        run: |
+          docker tag dataopstk/dock-r:latest-dev dataopstk/dock-r:latest
+      - name: Retag Test
         uses: ./.github/actions/docker-retag
         with:
           imageName: dataopstk/dock-r
@@ -99,3 +102,11 @@ jobs:
           tagAs: latest
           dockerUser: ${{ secrets.DOCKER_USER }}
           dockerPassword: ${{ secrets.DOCKER_SECRET }}
+      - name: Smart Build Test
+        uses: ./.github/actions/docker-smart-build
+        with:
+          dockerfilePath: ./Dockerfile
+          tagAs: dataopstk/dock-r:commit-${{ github.sha }}
+          dockerUser: ${{ secrets.DOCKER_USER }}
+          dockerPassword: ${{ secrets.DOCKER_SECRET }}
+          ignoreCaches: 0
