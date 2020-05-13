@@ -82,6 +82,10 @@ jobs:
       - name: Test install (pip install dock-r)
         run: |
           pip install dock-r
+      - name: Test CLI shortcuts
+        run: |
+          set -v
+          dock-r -- --help
       - name: Test uninstall (pip uninstall dock-r)
         run: |
           pip uninstall -y dock-r
