@@ -85,3 +85,18 @@ jobs:
       - name: Test uninstall (pip uninstall dock-r)
         run: |
           pip uninstall -y dock-r
+      - name: Login to docker
+        run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_SECRET }}
+      - name: Build and push (dataopstk/dock-r)
+        run:
+          cd ci-builder
+          docker build -t dataopstk/dock-r:latest-dev .
+          docker push dataopstk/dock-r:latest-dev
+      - name: Retag Dataops image
+        uses: ./.github/actions/docker-retag
+        with:
+          imageName: dataopstk/dock-r
+          existingTag: latest-dev
+          tagAs: latest
+          dockerUser: ${{ secrets.DOCKER_USER }}
+          dockerPassword: ${{ secrets.DOCKER_SECRET }}
