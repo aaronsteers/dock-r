@@ -1,4 +1,4 @@
-"""Install the runnow library."""
+"""Install the dock-r library."""
 
 import os
 from pathlib import Path
@@ -13,6 +13,11 @@ GIT_REPO_URL = "https://www.github.com/aaronsteers/runnow"
 AUTHOR_NAME = "Aaron (AJ) Steers"
 AUTHOR_EMAIL = "aj.steers@slalom.com"
 
+
+def _get_build_number():
+    return os.environ.get("BUILD_NUMBER", os.environ.get("GITHUB_RUN_NUMBER", None))
+
+
 if "VERSION" in os.environ:
     DETECTED_VERSION = os.environ["VERSION"]
     if "/" in DETECTED_VERSION:
@@ -20,8 +25,9 @@ if "VERSION" in os.environ:
 if not DETECTED_VERSION and os.path.exists(VERSION_FILEPATH):
     DETECTED_VERSION = Path(VERSION_FILEPATH).read_text()
     if len(DETECTED_VERSION.split(".")) <= 3:
-        if "BUILD_NUMBER" in os.environ:
-            DETECTED_VERSION = f"{DETECTED_VERSION}.{os.environ['BUILD_NUMBER']}"
+        build_num = _get_build_number()
+        if build_num:
+            DETECTED_VERSION = f"{DETECTED_VERSION}.{build_num}"
 if not DETECTED_VERSION:
     raise RuntimeError("Error. Could not detect version.")
 DETECTED_VERSION = DETECTED_VERSION.replace(".dev0", "")
@@ -69,4 +75,4 @@ setup(
     ],
 )
 # Revert `.dev0` suffix
-Path(VERSION_FILEPATH).write_text(f"v{DETECTED_VERSION.replace('.dev0', '')}")
+# Path(VERSION_FILEPATH).write_text(f"v{DETECTED_VERSION.replace('.dev0', '')}")
