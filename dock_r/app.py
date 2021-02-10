@@ -16,12 +16,18 @@ docker run --rm -it -v %cd%:/home -w /home {image} %*
 
 LIN_SHELL_SCRIPT_TEMPLATE = """
 #!/bin/bash
+
+WRAPPER_PATH=$0
+
+echo "Running dockerized shim:      $WRAPPER_PATH"
+echo "To uninstall this shim file:  rm $WRAPPER_PATH"
+
 docker pull {image} >2>&1
 docker run --rm -it -v ${cwd}:/home -w /home {image} %*
 """
 
 
-def run(image: str, raise_error=True, rm=True):
+def run(image: str, raise_error=True, rm=True, *args, **kwargs):
     """Run an image as an app.
 
     The active directory will automatically be mapped on the container as a volume, and
@@ -39,7 +45,8 @@ def run(image: str, raise_error=True, rm=True):
     """
     cwd = os.getcwd()
     dock_r.pull(image)
-    runnow.run(f"docker run --rm -it -v {cwd}:/home -w /home {image}")
+    argstr = " ".join()
+    runnow.run(f"docker run --rm -it -v {cwd}:/home -w /home {image} {*args} {**kwargs}")
 
 
 def install(image: str, alias: str):
