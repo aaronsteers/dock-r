@@ -1,12 +1,20 @@
-name: CI/CD Builds
+# Instructions:
+#
+# 1. Save this file as `{root}/.github/workflows/cicd.yml`.
+# 2. Set the `PYPI_USER` and `PYPI_PASS` secrets in your GitHub CI config.
+# 3. Update the `PYPACKAGE_NAME` declaration to the name you want to use in PyPi.
+#
+# Public Gist: https://gist.github.com/aaronsteers/f3eec4db94d3db1de78b76b3318e9e33
 
+name: Python CI/CD
+env:
+  PYPACKAGE_NAME: dock-r
 on:
   push:
     branches:
       - "**"
     paths-ignore:
       - docs/**.md
-
 jobs:
   python_build_and_test:
     runs-on: ubuntu-latest
@@ -19,27 +27,29 @@ jobs:
     steps:
       - name: Clone git repo
         uses: actions/checkout@v1
+      - name: "Print Version Info (build number ${{ github.run_number }})"
+        run: |
+          echo "Build Number: $GITHUB_RUN_NUMBER"
+          echo "Version:      $(cat VERSION).$GITHUB_RUN_NUMBER"
+          echo "Run ID:       ${{ github.run_id }}"
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies (python pip)
+      - name: Install pipx and poetry
         run: |
-          python3 -m pip install --upgrade pip
-          pip3 install flake8 pytest
-      - name: Install dock-r
+          python3 -m pip install pipx
+          python3 -m pipx ensurepath
+          pipx install poetry
+      - name: Install package using poetry
         run: |
-          python3 setup.py install
-      - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      # - name: Test with pytest
+          poetry install
+      # - name: Lint with flake8
       #   run: |
-      #     pytest
-
+      #     # stop the build if there are Python syntax errors or undefined names
+      #     poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      #     # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+      #     #poetry run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
   pypi_publish:
     runs-on: ubuntu-latest
@@ -47,7 +57,7 @@ jobs:
       max-parallel: 4
       matrix:
         python-version:
-          - 3.8
+          - 3.7
     needs:
       - python_build_and_test
     steps:
@@ -57,53 +67,44 @@ jobs:
         uses: actions/setup-python@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Push to PyPi (https://pypi.org/project/dock-r/)
+      - name: Install pipx and poetry
+        run: |
+          python3 -m pip install pipx
+          python3 -m pipx ensurepath
+          pipx install poetry
+      - name: Push to PyPi (build number ${{ github.run_number }})
         env:
           BRANCH_NAME: ${{ github.ref }}
           PYPI_USER: ${{ secrets.PYPI_USER }}
           PYPI_PASS: ${{ secrets.PYPI_SECRET }}
         run: |
-          echo -e "Installing twine...\n\n"
-          pip install twine
-          echo -e "\nCreating setup package...\n\n"
-          python setup.py sdist
-          echo -e "\nPublishing to version ref '$VERSION'...\n\n"
-          twine upload -u $PYPI_USER -p $PYPI_PASS dist/*
-      - name: Sleep before install
+          if [[ "$BRANCH_NAME" == *master ]]
+          then
+            poetry version --short
+          else
+            poetry version $(poetry version --short)-dev.$GITHUB_RUN_NUMBER
+            poetry version --short
+          fi
+          echo -e "\nPublishing to version ref '$(poetry version --short)'...\n\n"
+          poetry config http-basic.pypi $PYPI_USER $PYPI_PASS
+          poetry publish --build
+      - name: Wait up to 3 minutes for PyPi availability
         run: |
-          sleep 60
-      - name: Test install (pip install dock-r)
-        run: |
-          pip install --no-cache-dir dock-r==$(cat VERSION)
-      - name: Test CLI shortcuts
-        run: |
-          set -v
-          dock-r -- --help
-      - name: Test uninstall (pip uninstall dock-r)
-        run: |
-          pip uninstall -y dock-r
-      - name: Login to docker
-        run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_SECRET }}
-      - name: Build and push (dataopstk/dock-r)
-        run: |
-          docker build -t dataopstk/dock-r:latest-dev .
-          docker push dataopstk/dock-r:latest-dev
-      - name: Temporarily retag local image as latest
-        run: |
-          docker tag dataopstk/dock-r:latest-dev dataopstk/dock-r:latest
-      - name: Retag Test
-        uses: ./.github/actions/docker-retag
-        with:
-          imageName: dataopstk/dock-r
-          existingTag: latest-dev
-          tagAs: latest
-          dockerUser: ${{ secrets.DOCKER_USER }}
-          dockerPassword: ${{ secrets.DOCKER_SECRET }}
-      - name: Smart Build Test
-        uses: ./.github/actions/docker-smart-build
-        with:
-          dockerfilePath: ./Dockerfile
-          tagAs: dataopstk/dock-r:commit-${{ github.sha }}
-          dockerUser: ${{ secrets.DOCKER_USER }}
-          dockerPassword: ${{ secrets.DOCKER_SECRET }}
-          ignoreCaches: 0
+          pwd
+          ls -la
+          export VER=$(cat VERSION)
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          echo "Checking for PyPi availability of version $VER"
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not yet found..."; sleep 30; } fi;
+          export PIPERR=$(pip install $PYPACKAGE_NAME==$VER 2>&1)
+          if [[ $PIPERR == *"$VER"* ]]; then { echo "Yes"; } else { echo "Not found. Giving up. Last message from PyPi was $PIPERR"; exit 1; } fi;
