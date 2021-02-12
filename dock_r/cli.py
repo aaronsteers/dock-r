@@ -21,5 +21,8 @@ from dock_r.main import (
     get_ecs_task_detail_url,
 )
 
+from dock_r.app import install, uninstall
+
+
 def _main():
     _fire.Fire()
