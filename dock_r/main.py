@@ -21,8 +21,7 @@ def build(dockerfile_path, tag_as, addl_args=None):
     """ Build an image. 'tag_as' can be a string or list of strings """
     folder_path = os.path.dirname(dockerfile_path)
     addl_args = addl_args or ""
-    tag_as = _to_list(tag_as)
-    if tag_as:
+    if tag_as := _to_list(tag_as):
         tags = " ".join([f"-t {t}" for t in tag_as])
         cmd = f"docker build {addl_args} {tags} {folder_path} -f {dockerfile_path}"
     else:
@@ -33,9 +32,7 @@ def build(dockerfile_path, tag_as, addl_args=None):
 def _to_list(str_or_list):
     if str_or_list is None:
         return []
-    if isinstance(str_or_list, str):
-        return str_or_list.split(",")
-    return str_or_list
+    return str_or_list.split(",") if isinstance(str_or_list, str) else str_or_list
 
 
 def tag(image_name: str, tag_as):
@@ -53,8 +50,7 @@ def push(image_name):
 
 
 def smart_split(dockerfile_path: str, tag_as, addl_args=None):
-    tag_as = _to_list(tag_as)
-    if tag_as:
+    if tag_as := _to_list(tag_as):
         interim_image_name = tag_as[0].split(":")[0]
     else:
         interim_image_name = "untitled_image"
@@ -152,10 +148,7 @@ def exists_locally(image_name):
 
 def exists_remotely(image_name):
     try:
-        image = docker_client.images.get_registry_data(image_name)
-        if image:
-            return True
-        return False
+        return bool(image := docker_client.images.get_registry_data(image_name))
     except docker.errors.ImageNotFound:
         return False
     except Exception as ex:
@@ -297,10 +290,7 @@ def remote_retag(image_name, existing_tag, tag_as, with_login=False):
     existing_fullname = f"{image_name}:{existing_tag}"
     pull(existing_fullname)
     for new_tag in tag_as:
-        if ":" in new_tag:
-            new_fullname = new_tag
-        else:
-            new_fullname = f"{image_name}:{new_tag}"
+        new_fullname = new_tag if ":" in new_tag else f"{image_name}:{new_tag}"
         tag(existing_fullname, new_fullname)
         push(new_fullname)
 
@@ -324,10 +314,7 @@ def ecs_submit(
         f" --cluster {cluster}"
         f" --region {region}"
     )
-    if use_fargate:
-        cmd += f" --launch-type FARGATE"
-    else:
-        cmd += f" --launch-type EC2"
+    cmd += " --launch-type FARGATE" if use_fargate else " --launch-type EC2"
     if env_overrides and isinstance(env_overrides, str):
         env_overrides = {
             x.split("=")[0]: x.split("=")[1] for x in env_overrides.split(",")
@@ -343,10 +330,9 @@ def ecs_submit(
                 "container_name is required if "
                 "cmd_override or env_overrides are specified"
             )
-        env_override_str = ""
         cmd_override_str = ""
-        if env_overrides:
-            env_override_str = (
+        env_override_str = (
+            (
                 ',"environment":['
                 + ",".join(
                     [
@@ -356,6 +342,10 @@ def ecs_submit(
                 )
                 + "]"
             )
+            if env_overrides
+            else ""
+        )
+
         if cmd_override:
             cmd_override_str = f", 'command': ['{cmd_override}']"
         overrides = (
